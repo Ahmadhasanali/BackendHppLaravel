@@ -65,8 +65,8 @@ class HppController extends Controller
 
        $cost = $this->getCost(ucfirst($validate['type']), $validate['date'], $validate['price']);
        $totalCost = $this->getTotalCost($validate['qty'], $cost);
-       $qtyBalance = $this->getQtyBalance($validate['date'], $validate['qty']);
-       $valueBalance = $this->getValueBalance($validate['date'], $totalCost);
+       $qtyBalance =Hpp::where('date', '<=', $validate['date'])->where('id', '<>', $data->id)->orderBy('date', 'desc')->orderBy('id', 'desc')->first()->qty_balance + $validate['qty'];
+       $valueBalance =Hpp::where('date', '<=', $validate['date'])->where('id', '<>', $data->id)->orderBy('date', 'desc')->orderBy('id', 'desc')->first()->validate_balance + $totalCost;
        $hpp = $valueBalance/$qtyBalance;
 
        try {
@@ -103,7 +103,7 @@ class HppController extends Controller
     {
         $data = Hpp::where('id', $request->id)->firstOrFail();
         $data->delete();
-        $nData = Hpp::where('date', '>', $data['date'])->orderBy('date', 'asc')->get();
+        $nData = Hpp::where('date', '>=', $data['date'])->orderBy('date', 'asc')->get();
 
         foreach($nData as $value){
             $this->updateDataAfter($value);
@@ -128,7 +128,7 @@ class HppController extends Controller
         }else{
             try {
                 DB::beginTransaction();
-                $newData = $this->singleStore($data, $cost, $totalCost, $qtyBalance, $valueBalance, $hpp);
+                $this->singleStore($data, $cost, $totalCost, $qtyBalance, $valueBalance, $hpp);
                 DB::commit();
                } catch (\Throwable $th) {
                 DB::rollBack();
@@ -160,8 +160,9 @@ class HppController extends Controller
             DB::beginTransaction();
             $value->cost = $this->getCost($value->description, $value->date, $value->price);
             $value->total_cost = $this->getTotalCost($value->qty, $value->cost);
-            $value->qty_balance = $this->getQtyBalance($value->date, $value->qty);
-            $value->value_balance = $this->getValueBalance($value->date, $value->total_cost);
+            $value->qty_balance = Hpp::where('date', '<=', $value->date)->where('id', '<>', $value->id)->orderBy('date', 'desc')->orderBy('id', 'desc')->first()->qty_balance + $value->qty;
+            $value->value_balance = Hpp::where('date', '<=', $value->date)->where('id', '<>', $value->id)->orderBy('date', 'desc')->orderBy('id', 'desc')->first()->value_balance + $value->total_cost;
+            $value->hpp = $value->value_balance / $value->qty_balance;
             $value->save();
             DB::commit();
         } catch(\Throwable $th){
